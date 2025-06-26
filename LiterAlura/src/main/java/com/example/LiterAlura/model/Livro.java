@@ -20,6 +20,9 @@ public class Livro {
     @JsonAlias("languages")
     private String[] idiomas;
 
+    @JsonAlias("download_count")
+    private Long count;
+
     public Long getId() {
         return id;
     }
@@ -52,13 +55,21 @@ public class Livro {
         this.idiomas = idiomas;
     }
 
+    public Long getCount() {
+        return count;
+    }
+
+    public void setCount(Long count) {
+        this.count = count;
+    }
+
     @Override
     public String toString() {
         String autoresStr = Arrays.stream(autores)
                 .map(Autor::getName)
                 .collect(Collectors.joining(", "));
         String idiomasStr = String.join(", ", idiomas);
-        return String.format("Livro{id=%d, titulo='%s', autores=%s, idiomas=%s}",
-                id, titulo, autoresStr, idiomasStr);
+        return String.format("Livro{id=%d, titulo='%s', autores=%s, idiomas=%s, Downloads=%d}",
+                id, titulo, autoresStr, idiomasStr, count);
     }
 }

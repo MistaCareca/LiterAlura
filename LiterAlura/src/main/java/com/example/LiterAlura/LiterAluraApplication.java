@@ -12,14 +12,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Scanner;
-import java.util.stream.Collectors;
 
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
 public class LiterAluraApplication implements CommandLineRunner {
 	private static final Logger logger = LoggerFactory.getLogger(LiterAluraApplication.class);
-	private static int LIMITE_LIVROS = 5; // Valor padrão
+	private static int LIMITE_LIVROS = 5;
+	private static int MAX_PAGES = 10;
 
 	public static void main(String[] args) {
 		SpringApplication.run(LiterAluraApplication.class, args);
@@ -54,7 +56,7 @@ public class LiterAluraApplication implements CommandLineRunner {
 						}
 						ResultadoBusca resultado = apiClient.buscarLivroPorTitulo(titulo);
 						logger.info("Resultados encontrados: {}", resultado.getCount());
-						exibirResultados(resultado);
+						apiClient.exibirLivros(Arrays.asList(resultado.getResults()), LIMITE_LIVROS, logger);
 						break;
 					case 2:
 						System.out.print("Digite o número máximo de livros a exibir: ");
@@ -67,9 +69,40 @@ public class LiterAluraApplication implements CommandLineRunner {
 						} catch (NumberFormatException e) {
 							throw new EntradaInvalidaException("Digite um número válido para o limite.");
 						}
+						System.out.print("Digite o número máximo de paginas a exibir: ");
+						try {
+							MAX_PAGES = Integer.parseInt(scanner.nextLine().trim());
+							if (MAX_PAGES <= 0) {
+								throw new EntradaInvalidaException("O limite deve ser maior que zero.");
+							}
+							System.out.println("Limite configurado para " + MAX_PAGES + " livros.");
+						} catch (NumberFormatException e) {
+							throw new EntradaInvalidaException("Digite um número válido para o limite.");
+						}
+						break;
+					case 3:
+						System.out.print("Digite o ID do livro para buscar: ");
+						try {
+							int id = Integer.parseInt(scanner.nextLine().trim());
+							if (id <= 0) {
+								throw new EntradaInvalidaException("O ID deve ser um número positivo.");
+							}
+							if (LIMITE_LIVROS == 0) {
+								throw new EntradaInvalidaException("O limite de livros não foi configurado. Use a opção 2 primeiro.");
+							}
+							Livro livro = apiClient.buscarLivroPorID(id);
+							logger.info("Resultado encontrado para ID {}: 1", id);
+							apiClient.exibirLivros(Collections.singletonList(livro), 1, logger);
+						} catch (NumberFormatException e) {
+							throw new EntradaInvalidaException("Digite um número válido para o ID.");
+						}
+						break;
+					case 4:
+						System.out.println("Listando todos os livros (limitado a " + LIMITE_LIVROS + " por vez, até " + MAX_PAGES + " páginas)...");
+						apiClient.buscarTodosLivros(LIMITE_LIVROS, MAX_PAGES, logger);
 						break;
 					default:
-						throw new EntradaInvalidaException("Opção inválida. Escolha um número entre 0 e 2.");
+						throw new EntradaInvalidaException("Opção inválida. Escolha um número entre 0 e 4.");
 				}
 			} catch (EntradaInvalidaException e) {
 				logger.warn("Erro de entrada: {}", e.getMessage());
@@ -78,7 +111,7 @@ public class LiterAluraApplication implements CommandLineRunner {
 				logger.error("Erro na API: {}", e.getMessage(), e);
 				System.out.println("Erro: " + e.getMessage());
 			}
-		}
+        }
 
 		scanner.close();
 	}
@@ -86,44 +119,9 @@ public class LiterAluraApplication implements CommandLineRunner {
 	private void exibirMenu() {
 		System.out.println("\n=== LiterAlura ===");
 		System.out.println("1 - Buscar livro por título");
-		System.out.println("2 - Configurações básicas (definir limite de livros)");
+		System.out.println("2 - Configurações básicas");
+		System.out.println("3 - Buscar livro por ID");
+		System.out.println("4 - Listar todos os livros");
 		System.out.println("0 - Sair");
-	}
-
-	private void exibirResultados(ResultadoBusca resultado) {
-		if (resultado == null || resultado.getResults() == null || resultado.getResults().length == 0) {
-			System.out.println("Nenhum livro encontrado.");
-			return;
-		}
-
-		System.out.println("-".repeat(110));
-		System.out.printf("%-5s %-50s %-30s %-20s%n", "ID", "Título", "Autores", "Idiomas");
-		System.out.println("-".repeat(110));
-
-		int i = 0;
-		for (Livro livro : resultado.getResults()) {
-			if (i >= LIMITE_LIVROS) break;
-
-			String autoresStr = livro.getAuthors() != null
-					? Arrays.stream(livro.getAuthors())
-					.map(autor -> autor.getName() != null ? autor.getName() : "desconhecido")
-					.collect(Collectors.joining(", "))
-					: "N/A";
-			String idiomasStr = livro.getLanguages() != null
-					? String.join(", ", livro.getLanguages())
-					: "N/A";
-
-			System.out.printf("%-5d %-50s %-30s %-20s%n",
-					livro.getId() != null ? livro.getId() : 0,
-					limitarString(livro.getTitle() != null ? livro.getTitle() : "desconhecido", 50),
-					limitarString(autoresStr, 30),
-					limitarString(idiomasStr, 20));
-			i++;
-		}
-		System.out.println("-".repeat(110));
-	}
-
-	private String limitarString(String texto, int max) {
-		return texto.length() > max ? texto.substring(0, max - 3) + "..." : texto;
 	}
 }

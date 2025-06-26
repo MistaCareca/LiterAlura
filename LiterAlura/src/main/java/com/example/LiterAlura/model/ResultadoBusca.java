@@ -9,6 +9,8 @@ import java.util.stream.Collectors;
 public class ResultadoBusca {
     private Integer count;
     private Livro[] results;
+    private String next;
+    private String previous;
 
     public Integer getCount() {
         return count;
@@ -26,6 +28,22 @@ public class ResultadoBusca {
         this.results = results;
     }
 
+    public String getNext() {
+        return next;
+    }
+
+    public void setNext(String next) {
+        this.next = next;
+    }
+
+    public String getPrevious() {
+        return previous;
+    }
+
+    public void setPrevious(String previous) {
+        this.previous = previous;
+    }
+
     @Override
     public String toString() {
         String resultsStr = results != null
@@ -33,8 +51,7 @@ public class ResultadoBusca {
                 .map(Livro::toString)
                 .collect(Collectors.joining(", "))
                 : "[]";
-        return String.format("ResultadoBusca{count=%d, results=[%s]}",
-                count != null ? count : 0,
-                resultsStr);
+        return String.format("ResultadoBusca{count=%d, results=[%s], next=%s, previous=%s}",
+                count != null ? count : 0, resultsStr, next, previous);
     }
 }
