@@ -7,6 +7,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class Autor {
     @JsonAlias("name")
     private String nome;
+    @JsonAlias("birth_year")
+    private String nascimento;
+    @JsonAlias("death_year")
+    private String morte;
 
     public Autor() {}
 
@@ -18,8 +22,26 @@ public class Autor {
         this.nome = nome;
     }
 
+    public String getMorte() {
+        return morte;
+    }
+
+    public void setMorte(String morte) {
+        this.morte = morte;
+    }
+
+    public String getNascimento() {
+        return nascimento;
+    }
+
+    public void setNascimento(String nascimento) {
+        this.nascimento = nascimento;
+    }
+
     @Override
     public String toString() {
-        return String.format("Autor{nome='%s'}", nome != null ? nome : "desconhecido");
+        return "Autor: " + nome +
+                ", Ano de nascimento: " + nascimento +
+                ", Ano de falecimento: " + morte;
     }
 }

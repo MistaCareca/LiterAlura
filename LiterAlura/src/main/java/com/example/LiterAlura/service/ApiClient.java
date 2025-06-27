@@ -171,12 +171,107 @@ public class ApiClient {
             System.out.printf("%-5d %-50s %-30s %-20s %-15s%n",
                     livro.getId() != null ? livro.getId() : 0,
                     limitarString(livro.getTitle() != null ? livro.getTitle() : "desconhecido", 50),
-                    limitarString(autoresStr, 30),
+                    limitarString(autoresStr, 60),
                     limitarString(idiomasStr, 20),
                     limitarString(downloadStr, 15));
             i++;
         }
         System.out.println("-".repeat(110));
+    }
+
+    public void buscarAutoresVivos(int startYear, int endYear, int limiteLivros, int maxPages, Logger logger) throws ApiRequestException {
+        if (startYear >= endYear) {
+            throw new IllegalArgumentException("O ano inicial deve ser menor que o ano final.");
+        }
+        if (startYear <= 0 || endYear <= 0) {
+            throw new IllegalArgumentException("Os anos devem ser positivos.");
+        }
+
+        String nextUrl = BASE_URL + "?author_year_start=" + startYear + "&author_year_end=" + endYear;
+        int pageCount = 0;
+
+        try {
+            while (nextUrl != null && pageCount < maxPages) {
+                long startTime = System.currentTimeMillis();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(nextUrl))
+                        .GET()
+                        .header("Accept", "application/json")
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                long endTime = System.currentTimeMillis();
+                logger.info("Requisição para {} levou {} ms", nextUrl, endTime - startTime);
+
+                if (response.statusCode() != 200) {
+                    throw new ApiRequestException("Erro na requisição: código (" + response.statusCode() + ")");
+                }
+                if (response.body() == null || response.body().isEmpty()) {
+                    throw new ApiRequestException("Resposta da API vazia.");
+                }
+
+                ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
+                if (resultado.getResults() != null) {
+                    exibirLivros(Arrays.asList(resultado.getResults()), limiteLivros, logger);
+                }
+
+                nextUrl = resultado.getNext();
+                pageCount++;
+                logger.info("Página {} processada", pageCount);
+            }
+            if (pageCount >= maxPages) {
+                System.out.println("Limite de " + maxPages + " páginas atingido. Use um limite maior se necessário.");
+            }
+        } catch (JsonProcessingException e) {
+            throw new ApiRequestException("Erro ao processar o JSON da API: " + e.getMessage(), e);
+        } catch (IOException | InterruptedException e) {
+            throw new ApiRequestException("Erro ao realizar a requisição à API: " + e.getMessage(), e);
+        }
+    }
+
+    public void buscarPorIdioma(String idioma, int limiteLivros, int maxPages, Logger logger) throws ApiRequestException {
+        if (idioma == null || idioma.trim().isEmpty()) {
+            throw new IllegalArgumentException("O idioma não pode ser vazio.");
+        }
+
+        String nextUrl = BASE_URL + "?languages=" + idioma.trim();
+        int pageCount = 0;
+
+        try {
+            while (nextUrl != null && pageCount < maxPages) {
+                long startTime = System.currentTimeMillis();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(nextUrl))
+                        .GET()
+                        .header("Accept", "application/json")
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                long endTime = System.currentTimeMillis();
+                logger.info("Requisição para {} levou {} ms", nextUrl, endTime - startTime);
+
+                if (response.statusCode() != 200) {
+                    throw new ApiRequestException("Erro na requisição: código (" + response.statusCode() + ")");
+                }
+                if (response.body() == null || response.body().isEmpty()) {
+                    throw new ApiRequestException("Resposta da API vazia.");
+                }
+
+                ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
+                if (resultado.getResults() != null) {
+                    exibirLivros(Arrays.asList(resultado.getResults()), limiteLivros, logger);
+                }
+
+                nextUrl = resultado.getNext();
+                pageCount++;
+                logger.info("Página {} processada", pageCount);
+            }
+            if (pageCount >= maxPages) {
+                System.out.println("Limite de " + maxPages + " páginas atingido. Use um limite maior se necessário.");
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new ApiRequestException("Erro ao realizar a requisição à API: " + e.getMessage(), e);
+        }
     }
 
     private String limitarString(String texto, int max) {

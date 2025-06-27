@@ -2,6 +2,7 @@ package com.example.LiterAlura;
 
 import com.example.LiterAlura.exception.ApiRequestException;
 import com.example.LiterAlura.exception.EntradaInvalidaException;
+import com.example.LiterAlura.model.Idioma;
 import com.example.LiterAlura.model.Livro;
 import com.example.LiterAlura.model.ResultadoBusca;
 import com.example.LiterAlura.service.ApiClient;
@@ -12,10 +13,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
 public class LiterAluraApplication implements CommandLineRunner {
@@ -72,7 +73,7 @@ public class LiterAluraApplication implements CommandLineRunner {
 						System.out.print("Digite o número máximo de paginas a exibir: ");
 						try {
 							MAX_PAGES = Integer.parseInt(scanner.nextLine().trim());
-							if (MAX_PAGES <= 0) {
+							if (LIMITE_LIVROS <= 0) {
 								throw new EntradaInvalidaException("O limite deve ser maior que zero.");
 							}
 							System.out.println("Limite configurado para " + MAX_PAGES + " livros.");
@@ -101,8 +102,24 @@ public class LiterAluraApplication implements CommandLineRunner {
 						System.out.println("Listando todos os livros (limitado a " + LIMITE_LIVROS + " por vez, até " + MAX_PAGES + " páginas)...");
 						apiClient.buscarTodosLivros(LIMITE_LIVROS, MAX_PAGES, logger);
 						break;
+					case 5:
+						System.out.print("Digite o ano inicial (ex.: 1800): ");
+						int startYear = Integer.parseInt(scanner.nextLine().trim());
+						System.out.print("Digite o ano final (ex.: 1899): ");
+						int endYear = Integer.parseInt(scanner.nextLine().trim());
+						System.out.println("Listando autores vivos entre " + startYear + " e " + endYear + " (limitado a " + LIMITE_LIVROS + " por vez, até " + MAX_PAGES + " páginas)...");
+						apiClient.buscarAutoresVivos(startYear, endYear, LIMITE_LIVROS, MAX_PAGES, logger);
+						break;
+					case 7:
+						System.out.println("Idiomas disponíveis: " + listarIdiomasDisponiveis());
+						System.out.print("Digite o código do idioma (ex.: en, pt): ");
+						String codigoIdioma = scanner.nextLine().trim().toLowerCase();
+						Idioma idioma = Idioma.fromCodigo(codigoIdioma);
+						System.out.println("Listando livros no idioma " + idioma.getNome() + " (" + idioma.getCodigo() + ") (limitado a " + LIMITE_LIVROS + " por vez, até " + MAX_PAGES + " páginas)...");
+						apiClient.buscarPorIdioma(idioma.getCodigo(), LIMITE_LIVROS, MAX_PAGES, logger);
+						break;
 					default:
-						throw new EntradaInvalidaException("Opção inválida. Escolha um número entre 0 e 4.");
+						throw new EntradaInvalidaException("Opção inválida. Escolha um número entre 0 e 7.");
 				}
 			} catch (EntradaInvalidaException e) {
 				logger.warn("Erro de entrada: {}", e.getMessage());
@@ -110,11 +127,22 @@ public class LiterAluraApplication implements CommandLineRunner {
 			} catch (ApiRequestException e) {
 				logger.error("Erro na API: {}", e.getMessage(), e);
 				System.out.println("Erro: " + e.getMessage());
+			} catch (NumberFormatException e) {
+				logger.warn("Entrada inválida: {}", e.getMessage());
+				System.out.println("Erro: Digite um número válido.");
+			} catch (IllegalArgumentException e) {
+				logger.warn("Idioma inválido: {}", e.getMessage());
+				System.out.println("Erro: " + e.getMessage());
 			}
-        }
-
+		}
 		scanner.close();
 	}
+
+	private String listarIdiomasDisponiveis() {
+		return Arrays.stream(Idioma.values())
+			.map(idioma -> idioma.getCodigo() + " (" + idioma.getNome() + ")")
+			.collect(Collectors.joining(", "));
+}
 
 	private void exibirMenu() {
 		System.out.println("\n=== LiterAlura ===");
@@ -122,6 +150,8 @@ public class LiterAluraApplication implements CommandLineRunner {
 		System.out.println("2 - Configurações básicas");
 		System.out.println("3 - Buscar livro por ID");
 		System.out.println("4 - Listar todos os livros");
+		System.out.println("5 - Listar autores vivos em uma faixa de anos");
+		System.out.println("7 - Listar livros por idioma");
 		System.out.println("0 - Sair");
 	}
 }
