@@ -1,12 +1,17 @@
 package com.example.LiterAlura.service;
 
 import com.example.LiterAlura.exception.ApiRequestException;
+import com.example.LiterAlura.model.Autor;
 import com.example.LiterAlura.model.Livro;
 import com.example.LiterAlura.model.ResultadoBusca;
+import com.example.LiterAlura.repository.autorRepository;
+import com.example.LiterAlura.repository.livroRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,27 +24,28 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+@Service
 public class ApiClient {
     private static final Logger logger = LoggerFactory.getLogger(ApiClient.class);
     private final HttpClient client;
     private final ObjectMapper objectMapper;
     private static final String BASE_URL = "https://gutendex.com/books/";
+    private final livroRepository livroRepository;
+    private final autorRepository autorRepository;
 
-    public ApiClient() {
+    @Autowired
+    public ApiClient(livroRepository livroRepository, autorRepository autorRepository) {
         this.client = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_2)
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(10)) // Timeout de conexão
+                .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = new ObjectMapper();
-    }
-
-    public HttpClient getClient() {
-        return client;
-    }
-
-    public ObjectMapper getObjectMapper() {
-        return objectMapper;
+        this.livroRepository = livroRepository;
+        this.autorRepository = autorRepository;
+        if (autorRepository == null || livroRepository == null) {
+            throw new IllegalStateException("Repositórios não foram injetados corretamente!");
+        }
     }
 
     public ResultadoBusca buscarLivroPorTitulo(String titulo) throws ApiRequestException {
@@ -63,7 +69,20 @@ public class ApiClient {
             if (response.body() == null || response.body().isEmpty()) {
                 throw new ApiRequestException("Resposta da API vazia.");
             }
-            return objectMapper.readValue(response.body(), ResultadoBusca.class);
+            ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
+            for (Livro livro : resultado.getResults()) {
+                if (livro.getAuthors() != null && livro.getAuthors().length > 0) {
+                    Autor autor = livro.getAuthors()[0];
+                    autorRepository.save(autor);
+                    livro.setAuthors(new Autor[]{autor});
+                }
+                if (livro.getLanguages() != null && livro.getLanguages().length > 0) {
+                    livro.setLanguages(new String[]{livro.getLanguages()[0]});
+                }
+                livroRepository.save(livro);
+            }
+            logger.info("Livros salvos com sucesso: {}", resultado.getCount());
+            return resultado;
         } catch (JsonProcessingException e) {
             throw new ApiRequestException("Erro ao processar o JSON da API", e);
         } catch (IOException | InterruptedException e) {
@@ -91,7 +110,17 @@ public class ApiClient {
             if (response.body() == null || response.body().isEmpty()) {
                 throw new ApiRequestException("Resposta da API vazia.");
             }
-            return objectMapper.readValue(response.body(), Livro.class);
+            Livro livro = objectMapper.readValue(response.body(), Livro.class);
+            if (livro.getAuthors() != null && livro.getAuthors().length > 0) {
+                Autor autor = livro.getAuthors()[0];
+                autorRepository.save(autor);
+                livro.setAuthors(new Autor[]{autor});
+            }
+            if (livro.getLanguages() != null && livro.getLanguages().length > 0) {
+                livro.setLanguages(new String[]{livro.getLanguages()[0]});
+            }
+            livroRepository.save(livro);
+            return livro;
         } catch (JsonProcessingException e) {
             throw new ApiRequestException("Erro ao processar o JSON da API", e);
         } catch (IOException | InterruptedException e) {
@@ -125,6 +154,17 @@ public class ApiClient {
 
                 ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
                 if (resultado.getResults() != null) {
+                    for (Livro livro : resultado.getResults()) {
+                        if (livro.getAuthors() != null && livro.getAuthors().length > 0) {
+                            Autor autor = livro.getAuthors()[0];
+                            autorRepository.save(autor);
+                            livro.setAuthors(new Autor[]{autor});
+                        }
+                        if (livro.getLanguages() != null && livro.getLanguages().length > 0) {
+                            livro.setLanguages(new String[]{livro.getLanguages()[0]});
+                        }
+                        livroRepository.save(livro);
+                    }
                     exibirLivros(Arrays.asList(resultado.getResults()), limiteLivros, logger);
                 }
                 nextUrl = resultado.getNext();
@@ -158,13 +198,11 @@ public class ApiClient {
         for (Livro livro : livroArray) {
             if (i >= limite) break;
 
-            String autoresStr = livro.getAuthors() != null
-                    ? Arrays.stream(livro.getAuthors())
-                    .map(autor -> autor.getName() != null ? autor.getName() : "desconhecido")
-                    .collect(Collectors.joining(", "))
+            String autoresStr = livro.getAuthors() != null && livro.getAuthors().length > 0
+                    ? livro.getAuthors()[0].getName() != null ? livro.getAuthors()[0].getName() : "desconhecido"
                     : "N/A";
-            String idiomasStr = livro.getLanguages() != null
-                    ? String.join(", ", livro.getLanguages())
+            String idiomasStr = livro.getLanguages() != null && livro.getLanguages().length > 0
+                    ? livro.getLanguages()[0]
                     : "N/A";
             String downloadStr = livro.getCount() != null ? String.valueOf(livro.getCount()) : "N/A";
 
@@ -212,6 +250,17 @@ public class ApiClient {
 
                 ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
                 if (resultado.getResults() != null) {
+                    for (Livro livro : resultado.getResults()) {
+                        if (livro.getAuthors() != null && livro.getAuthors().length > 0) {
+                            Autor autor = livro.getAuthors()[0];
+                            autorRepository.save(autor);
+                            livro.setAuthors(new Autor[]{autor});
+                        }
+                        if (livro.getLanguages() != null && livro.getLanguages().length > 0) {
+                            livro.setLanguages(new String[]{livro.getLanguages()[0]});
+                        }
+                        livroRepository.save(livro);
+                    }
                     exibirLivros(Arrays.asList(resultado.getResults()), limiteLivros, logger);
                 }
 
@@ -259,6 +308,17 @@ public class ApiClient {
 
                 ResultadoBusca resultado = objectMapper.readValue(response.body(), ResultadoBusca.class);
                 if (resultado.getResults() != null) {
+                    for (Livro livro : resultado.getResults()) {
+                        if (livro.getAuthors() != null && livro.getAuthors().length > 0) {
+                            Autor autor = livro.getAuthors()[0];
+                            autorRepository.save(autor);
+                            livro.setAuthors(new Autor[]{autor});
+                        }
+                        if (livro.getLanguages() != null && livro.getLanguages().length > 0) {
+                            livro.setLanguages(new String[]{livro.getLanguages()[0]});
+                        }
+                        livroRepository.save(livro);
+                    }
                     exibirLivros(Arrays.asList(resultado.getResults()), limiteLivros, logger);
                 }
 
